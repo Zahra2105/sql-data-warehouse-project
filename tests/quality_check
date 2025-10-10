@@ -1,0 +1,86 @@
+/* ================================================================
+   DATA QUALITY CHECKS – BRONZE LAYER
+   Author: Zahra Kazemi
+   Purpose: Validate and standardize data in Bronze schema before ETL to Silver
+================================================================ */
+
+/*---------------------------------------------------------------
+  1. ERP_CUST_AZ12 TABLE
+----------------------------------------------------------------*/
+
+-- Preview data
+SELECT *
+FROM bronze.erp_cust_az12;
+
+-- Check for unwanted leading/trailing spaces
+SELECT gen
+FROM bronze.erp_cust_az12
+WHERE gen != TRIM(gen);
+
+-- Check for out-of-range birth dates (replace with NULL)
+SELECT bdate
+FROM bronze.erp_cust_az12
+WHERE bdate < '1924-01-01' OR bdate > '2050-01-01';
+
+-- Check for inconsistent gender values
+SELECT DISTINCT gen
+FROM bronze.erp_cust_az12;
+
+
+/*---------------------------------------------------------------
+  2. CRM_PRD_INFO TABLE
+----------------------------------------------------------------*/
+
+-- Preview data
+SELECT *
+FROM bronze.crm_prd_info;
+
+-- Duplicate and NULL Check (Expected: No results)
+SELECT prd_id, COUNT(*) AS cnt
+FROM bronze.crm_prd_info
+GROUP BY prd_id
+HAVING COUNT(*) > 1 OR prd_id IS NULL;
+
+-- Check for unwanted spaces in product names (Expected: No results)
+SELECT prd_nm
+FROM bronze.crm_prd_info
+WHERE prd_nm != TRIM(prd_nm);
+
+-- Check for invalid or missing numeric values
+-- Expectation: No negative or NULL values
+SELECT prd_cost
+FROM bronze.crm_prd_info
+WHERE prd_cost < 0 OR prd_cost IS NULL;
+
+-- Check distinct product lines for standardization
+SELECT DISTINCT prd_line
+FROM bronze.crm_prd_info;
+
+-- Check for invalid date ranges
+SELECT *
+FROM bronze.crm_prd_info
+WHERE prd_end_dt < prd_start_dt;
+
+
+/*---------------------------------------------------------------
+  3. CRM_SALES_DETAILS TABLE
+----------------------------------------------------------------*/
+
+-- Check for invalid integer date formats (zeros, short length)
+SELECT sls_order_dt
+FROM bronze.cr_dales_details
+WHERE sls_order_dt = 0 OR LEN(sls_order_dt) != 8;
+
+-- Check for invalid date order relationships
+SELECT *
+FROM bronze.crm_dales_details
+WHERE 
+    sls_order_dt > sls_ship_dt OR
+    sls_order_dt > sls_due_dt;
+
+-- Check data consistency between Sales, Quantity, and Price
+SELECT DISTINCT sls_sales, sls_quantity, sls_price
+FROM bronze.crm_dales_details
+WHERE 
+    sls_sales != sls_quantity * sls_price 
+    OR sls_sales
